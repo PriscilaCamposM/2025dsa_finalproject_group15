@@ -44,6 +44,7 @@ The study was conducted in 2023 and 2024 at J. Phil Campbell Sr. Research and Ed
 Plot measurements were 4x10 m, with 2 m alleys. 
 
 Cereal rye (CR) was used as cover crop, CR was drilled with a seeding rate of 56 kg ha. There were two CR planting timings (early and late), in 2022 the planting dates were Nov. 2 and Nov. 21, and in 2022, Oct. 5 and Nov. 21. CR was terminated 14-21 days pre planting (DPP) and 1-3 days after plating (DAP), herbicide program is shown in the table below. 
+![](../Treatments_herbicides.png)
 
 Soybeans were planted at a 371,287 seed ha-1 seeding rate, in 2023 soybean was planted in June 1st and June 4th in 2024. Soybean was harvested using the middle two rows in each split plot using a small plot combine, adjusting yield to 13% grain moisture and plot lenght. Harvest dates were 11/16/2023 and 11/26/2024.
 
@@ -66,7 +67,30 @@ there were 6 treatments in total (Cover crop x herbicide program), and 4 reps, g
 ## Statistical analysis  
 Describe here your statistical analysis, including what type of ANOVA model you ran (based on the design above), what was your response variable, what were your explanatory variables and how were the explanatory variables treated (random or fixed). Provide your alpha level. Explain which function from which package you used to analyze this data. Explain how you checked linear model assumptions and whether or not they were met. Overall, make sure you explain in sufficient detail that, if given your data, a knowledgeable person would be able to reproduce your analysis exactly. 
 
+For this study a analysis was done to observed how soybean and cover crop yield was affected by the different planting timings and cover crop termination. For all models ANOVA (type =3) was used, and Alpha levels were the same for all models (0.05). 
 
+Soybean Yield affected by planting timing and cover crop termination:
+1. Fixed effects: planting timing, cover crop termination and year. 
+2. Random effects: block and year.
+Year was selected both as fixed and random to see if there's any significant interaction between the explanatory variables within both years, but at the same time we want to consider the variability. 
+
+Cover crop yield affected by planting timing and cover crop termination:
+1. Fixed effects: planting timing, cover crop termination and year.
+2. Random effects: year 
+
+lmer was used to ran both models, since our experimental design is nested and we have random effect(s). 
+
+To check for assumptions, residuals were generated. All assumptions were met for soybean and cover crop yield. 
+
+Functions used:
+lmer
+Anova (Type =3)
+augment
+rstudent
+ranef
+ggplot 
+emmeans
+cld
 
 # Results  
 Here is where the coding is going to happen, and it will be completely up to you. Include under this section as many sub-sections (using ##) and as many chunks needed to create the analytical workflow for your analysis, starting at loading packages and data, wrangling, EDA, modeling, assumptions checking, ANOVA table, means, pairwise comparisons, and final publication-quality plot.  
@@ -76,6 +100,416 @@ Make sure to run a model that reflects your study design. Even if your study des
 Before each chunk, describe the steps being performed in that chunk. For example, "Here I will load the data".  
 
 If a chunk produces output, like printing a data frame, statistical summary, a plot, ANOVA table, etc., make sure to write text interpreting what you see and how you can/will use that information to move forward to the next steps in the workflow.  
+
+Loading packages
+```{r, warning = FALSE, message=FALSE}
+library(multcompView)
+library(tibble)
+library(ggplot2)
+library(readxl)
+library(janitor)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(tidyverse)
+library(car)
+library(lme4)
+library(broom)
+library(emmeans)
+library(multcomp) 
+library(broom.mixed)
+```
+
+Importing data
+```{r, warning = FALSE, message=FALSE}
+grow <- read_csv("../data/Grow.csv") %>%
+  clean_names()
+
+grow
+```
+
+Creating two data set from original, one for soybean yield and another for cover crop yield
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yield <- dplyr::select(grow,
+                               plantedtiming, year, plot, block, cc_termination, yield_kgha) %>%
+  drop_na()
+
+grow_cc_yield <- dplyr::select(grow,
+                               plantedtiming, year, plot, block, cc_termination, ccbiokgha) %>%
+  drop_na()
+```
+
+Running summary and glimpse for each data set
+```{r, warning = FALSE, message=FALSE}
+summary(grow_sb_yield)
+glimpse(grow_sb_yield)
+
+summary(grow_cc_yield)
+glimpse(grow_cc_yield)
+```
+
+based on summary and glimpse we need to wrangle both data set
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yieldw <- grow_sb_yield %>%
+  mutate(block = factor(block),
+         year = factor(year),
+         plantedtiming = factor(plantedtiming),
+         plot = factor(plot),
+         cc_termination = factor(cc_termination)
+         )
+
+grow_cc_yieldw <- grow_cc_yield %>%
+  mutate(block = factor(block),
+         year = factor(year),
+         plantedtiming = factor(plantedtiming),
+          plot = factor(plot),
+          cc_termination = factor(cc_termination)
+         )
+```
+
+Let's check the summary and glimpse again
+```{r, warning = FALSE, message=FALSE}
+summary(grow_sb_yieldw)
+glimpse(grow_sb_yieldw)
+
+summary(grow_cc_yieldw)
+glimpse(grow_cc_yieldw)
+```
+is looking good for both.
+
+
+EDA plots - Soybean yield
+```{r, warning = FALSE, message=FALSE}
+ggplot(grow_sb_yieldw, aes(x = cc_termination, 
+                         y = yield_kgha,
+                         color = year)) +
+  geom_boxplot() +
+  geom_jitter()
+
+ggplot(grow_sb_yieldw, aes(x = plantedtiming, 
+                           y = yield_kgha,
+                           color = year)) +
+  geom_boxplot() +
+  geom_jitter()
+```
+
+
+EDA plots - Cover crop yield
+```{r, warning = FALSE, message=FALSE}
+ggplot(grow_cc_yieldw, aes(x = cc_termination, 
+                           y = ccbiokgha,
+                           color = year)) +
+  geom_boxplot() +
+  geom_jitter()
+
+ggplot(grow_cc_yieldw, aes(x = plantedtiming, 
+                           y = ccbiokgha,
+                           color = year)) +
+  geom_boxplot() +
+  geom_jitter()
+```
+
+Let's set up to run our models
+```{r, warning = FALSE, message=FALSE}
+options(contrasts = c("contr.sum", "contr.poly"))
+```
+
+Let's start running our models
+Soybean yield
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yieldw_mod <- lmer(yield_kgha ~ plantedtiming*cc_termination*year + (1|year/block),
+                         data = grow_sb_yieldw)
+summary(grow_sb_yieldw_mod)
+
+Anova(grow_sb_yieldw_mod, type =3)
+
+```
+Based on our Anova table, there are two signicant interactions: planting timing, and planting timing within years.
+
+Let's check for assumptions
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yield_resid <- augment(grow_sb_yieldw_mod) %>%
+  mutate(.studresid=rstudent(grow_sb_yieldw_mod))
+
+grow_sb_yield_resid
+
+randeff_sb <- ranef(grow_sb_yieldw_mod)$block
+
+randeff_sb
+
+
+ggplot(randeff_sb, aes(sample=`(Intercept)`))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .7
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+
+ggplot(grow_sb_yield_resid, aes(x=.fitted, y=.studresid))+
+  geom_hline(yintercept = 0, color="red")+
+  geom_point(shape = 21,
+             fill = "purple", 
+             size = 3,
+             alpha = .7)+
+  geom_smooth()+
+  geom_hline(yintercept = c(-3,3), color = "red")+
+  theme_bw()  
+
+ggplot(grow_sb_yield_resid, aes(sample=.studresid))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .7
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+
+ggplot(grow_sb_yield_resid, aes(x=.studresid))+
+  geom_density(color = "black",
+               fill = "purple",
+               alpha = .7)+
+  scale_x_continuous(breaks = c(-3,0,3), limits = c(-3,3))+
+  theme_bw()
+```
+- Residual independence: there's no pattern
+- Residual variance homogeneity: no pattern
+- Residual normality: normal distribution
+- Outlier detection: all within the three standard deviations.
+
+extracting model means
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yieldw_means_plantedtiming <- emmeans(grow_sb_yieldw_mod, 
+                                  ~plantedtiming)
+
+grow_sb_yieldw_means_plantedtiming
+
+
+grow_sb_yieldw_means_plantedtimingyear <- emmeans(grow_sb_yieldw_mod,
+                                     ~plantedtiming:year)
+grow_sb_yieldw_means_plantedtimingyear
+```
+
+pairwise comparisons
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yield_cld_plantedtiming <- cld(grow_sb_yieldw_means_plantedtiming,
+                                       reversed=T,
+                                       adjust="none",
+                                       Letters=letters
+                                       )
+grow_sb_yield_cld_plantedtiming
+
+grow_sb_yield_cld_plantedtimingyear <- cld(grow_sb_yieldw_means_plantedtimingyear, 
+                                       reversed=T, 
+                                       adjust="none",
+                                       Letters=letters)
+grow_sb_yield_cld_plantedtimingyear
+```
+
+let's create a data frame including the letters to create the final plots
+```{r, warning = FALSE, message=FALSE}
+grow_sb_cld_selected <- grow_sb_yield_cld_plantedtiming %>%
+  as.data.frame() %>%
+  mutate(letter=trimws(.group))
+
+grow_sb_cld_selected
+
+grow_sb_cld_selected2 <- grow_sb_yield_cld_plantedtimingyear %>%
+  as.data.frame() %>%
+  mutate(letter=trimws(.group))
+
+grow_sb_cld_selected2
+```
+
+Final plots
+```{r, warning = FALSE, message=FALSE}
+ggplot(mapping = aes(fill = plantedtiming))+
+  # Raw data and boxplots  
+  geom_boxplot(data = grow_sb_yieldw,
+               aes(x = plantedtiming, y = yield_kgha),
+               alpha = .8) +
+  geom_jitter(data = grow_sb_yieldw,
+              aes(x = plantedtiming, y = yield_kgha),
+              shape = 21,
+              size = 3,
+              alpha = .6) +
+  # Adding letters
+  geom_label(data = grow_sb_cld_selected,
+             aes(x = plantedtiming, y = emmean, label = letter),
+             fill = "white") +
+  labs(x = "Planting Timing",
+       y = "Yield (kg/ha)") +
+  scale_fill_brewer(palette = 2) +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        legend.position = "none") +
+  scale_x_discrete(labels = c(earlyplanted = "Early planted",
+                              lateplanted = "Late planted"))
+
+ggsave("../output/soybean_yield_plantedtiming.png",
+       width = 8,
+       height = 5)
+
+ggplot(mapping = aes(fill = year))+
+  # Raw data and boxplots  
+  geom_boxplot(data = grow_sb_yieldw,
+               aes(x = plantedtiming, y = yield_kgha),
+               alpha = .8) +
+  geom_jitter(data = grow_sb_yieldw,
+              aes(x = plantedtiming, y = yield_kgha),
+              shape = 21,
+              size = 3,
+              alpha = .6) +
+  # Adding letters
+  geom_label(data = grow_sb_cld_selected2,
+             aes(x = plantedtiming, y = emmean, label = letter),
+             inherit.aes = FALSE,
+             fill = "white") +
+  labs(x = "Planting Timing",
+       y = "Yield (kg/ha)") +
+  scale_fill_brewer(palette = 2) +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+  scale_x_discrete(labels = c(earlyplanted = "Early planted",
+                              lateplanted = "Late planted"))
+
+ggsave("../output/sb_yield_plantedtiming_year.png",
+       width = 8,
+       height = 5)
+```
+
+
+Cover crop yield
+```{r, warning = FALSE, message=FALSE}
+grow_cc_yield_mod <- lmer(ccbiokgha ~ plantedtiming * cc_termination * year + (1 | year/block),
+                  data = grow_cc_yieldw)
+summary(grow_cc_yield_mod)
+
+Anova(grow_cc_yield_mod, type = 3)
+```
+
+Checking assumptions
+```{r, warning = FALSE, message=FALSE}
+grow_cc_yield_resid <- augment(grow_cc_yield_mod) %>%
+  mutate(.studresid=rstudent(grow_cc_yield_mod))
+
+grow_cc_yield_resid
+
+#random effects:
+  
+randeff_cc <- ranef(grow_cc_yield_mod)$year
+
+randeff_cc
+
+ggplot(randeff_cc, aes(sample=`(Intercept)`))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .7
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+
+
+#within group errors:
+  
+  ggplot(grow_cc_yield_resid, aes(x=.fitted, y=.studresid))+
+  geom_hline(yintercept = 0, color="red")+
+  geom_point(shape = 21,
+             fill = "purple", 
+             size = 3,
+             alpha = .7)+
+  geom_smooth()+
+  geom_hline(yintercept = c(-3,3), color = "red")+
+  theme_bw()  
+  
+ggplot(grow_cc_yield_resid, aes(sample=.studresid))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .7
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+
+ggplot(grow_cc_yield_resid, aes(x=.studresid))+
+  geom_density(color = "black",
+               fill = "purple",
+               alpha = .7)+
+  scale_x_continuous(breaks = c(-3,0,3), limits = c(-3,3))+
+  theme_bw()
+```
+All assumptions look good.
+
+Model means
+```{r, warning = FALSE, message=FALSE}
+grow_cc_yieldw_means_plantedtiming <- emmeans(grow_cc_yield_mod, 
+                                              ~plantedtiming)
+```
+
+Pairwise comparisons
+```{r, warning = FALSE, message=FALSE}
+grow_cc_yield_cld_plantedtiming <- cld(grow_cc_yieldw_means_plantedtiming, 
+                                       reversed=T, 
+                                       adjust="none",
+                                       Letters=letters)
+
+grow_cc_yield_cld_plantedtiming
+```
+
+creating data frame
+```{r, warning = FALSE, message=FALSE}
+grow_cc_cld_selected <- grow_cc_yield_cld_plantedtiming %>%
+  as.data.frame() %>%
+  mutate(letter=trimws(.group))
+
+grow_cc_cld_selected
+
+```
+
+Final plot
+```{r, warning = FALSE, message=FALSE}
+ggplot(mapping = aes(fill = plantedtiming))+
+  # Raw data and boxplots  
+  geom_boxplot(data = grow_cc_yieldw,
+               aes(x = plantedtiming, y = ccbiokgha),
+               alpha = .8) +
+  geom_jitter(data = grow_cc_yieldw,
+              aes(x = plantedtiming, y = ccbiokgha),
+              shape = 21,
+              size = 3,
+              alpha = .6) +
+  # Adding letters
+  geom_label(data = grow_cc_cld_selected,
+             aes(x = plantedtiming, y = emmean, label = letter),
+             fill = "white") +
+  labs(x = "Planting Timing",
+       y = "Yield (kg/ha)") +
+  scale_fill_brewer(palette = 3) +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        legend.position = "none") +
+  scale_x_discrete(label = c(earlyplanted = "Early Planted",
+                             lateplanted = "Late Planted"))
+
+ggsave("../output/cc_yield_plantedtiming.png",
+       width = 8,
+       height = 5)
+```
+Cereal rye biomass in 2023 was 51% lower than 2024, and for both years early planting resulted in higher biomass.
+soybean yield in 2024, had a 51% reduction, in 2024 late planted cover crops results in 37% increase.
+cereal rye was higher in 2024, explaing why we had lower weed count in 2024, so
+cereal rye along with an herbicide program can be effective tool. cereal rye created a large amount of biomass contributing to weed suppresion.
+cover crop can be critical component to creating iwm approaches for use in soybean in the southeasterns us. 
 
 # Team work in GitHub  
 Whether you are working with your future-self or as duos, make sure to stage, commit, and push after finishing each of the sub-sections above. When committing, write commit messages that are short and descriptive (e.g., finished wrangling).  
