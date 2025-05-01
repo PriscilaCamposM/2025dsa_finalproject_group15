@@ -1,0 +1,564 @@
+---
+title: "Data Science Applied to Ag - Final Project - Design"
+author: "Priscila Campos"
+format:
+  html:
+    code-fold: false
+    embed-resources: true
+    toc: true
+    number-sections: true
+    theme: cerulean
+---
+
+# Instructions  
+This file contains both the **instructions** for the mid-term project and placeholders for your code. You are required to use this file to produce code, output, and answers to the questions below.  
+
+Besides simply creating output, make sure to interpret the output. You will need to create tables and/or plots to arrive at the answers, and then comment on what you found below it.    
+
+To get you setup, you will need to:  
+
+  - Student #1: create a repository on your GitHub account. You can call this repository "2025dsa_finalproject_groupX", **where X is the number of your group**. Make it public, add a README, add a .gitignore for R.  
+  - Student #1: follow the steps we did in class to start a new RStudio project with version control.  
+  - Student #1: in your computer, create the sub-folders code, data, output, and move your data set into the `data` folder. Also, student 1 moves this current script into the `code` folder. Do a git stage, commit, push.  
+  - Student #1: on GitHub, go the repository settings and invite your partner to be a collaborator in the repository. That will give them push permission.  
+  - Now, both students should clone this repository on their computers like we did in class. Make sure this step works well and that you can pull and push from GitHub.  
+  - Student 2, after cloning, does a git pull to get all these updates on their computer.  
+  - Student 1 and 2 work together to update the README file. README files should explain what the repository is about, the goals of that project, who is working in it, and any other important details you may find.  
+  
+# Introduction  
+Soybean is the 5th largest commodity produced in the U.S., 2nd in global production, producing 113.3 million metric tons, which contributes $39.81 billion in exports. However, due to high demand, inadequate management and practices had led to yield reductions and deteriorating soil health. 
+
+According to extensive research, one solution that can address the previous issues is the use of cover crops; intensifying cover crop management has the potential to improve soil health, crop productivity, and conservation benefits within no-till systems but it requires site-specific adaptations. 
+
+According to CTIC and surveys, delaying termination of cover crops until soybean planting and planting green can have a significant impact on soybean production. 
+
+# Hypothesis and objectives  
+Hypothesis: early cereal rye planting and terminating cereal rye after soybean planting can increase soybean yield. 
+
+Objective: evaluate the impact of cereal rye planting and termination timings on soybean yield. 
+
+# Material and Methods  
+The study was conducted in 2023 and 2024 at J. Phil Campbell Sr. Research and Education Center (JPCREC), located near Watkinsville, GA. The soil type at JPREC is a Cecil sandy loam. 
+Plot measurements were 4x10 m, with 2 m alleys. 
+
+Cereal rye (CR) was used as cover crop, CR was drilled with a seeding rate of 56 kg ha. There were two CR planting timings (early and late), in 2022 the planting dates were Nov. 2 and Nov. 21, and in 2023, Oct. 5 and Nov. 21. CR was terminated 14-21 days pre planting (DPP) and 1-3 days after plating (DAP), herbicide program is shown in the table below. 
+![](../Treatments_herbicides.png)
+
+Soybeans were planted at a 371,287 seed/ha seeding rate, in 2023 soybean was planted in June 1st and June 4th in 2024. Soybean was harvested using the middle two rows in each split plot using a small plot combine, adjusting yield to 13% grain moisture and plot length. Harvest dates were 11/16/2023 and 11/26/2024.
+
+Data Collection:
+1. Cereal rye biomass:
+We harvest cereal rye biomass using a representative random sample collected at each termination. The sampling unit was a 0.25 m2 within each plot.  
+
+
+## Study design   
+The experimental desing was a Split-Split-plot with 3 levels, using RCBD as randomization of plots within blocks:
+1. Planting timing: early and late planting (whole plot)
+2. Cover crop termination timings: No cover crop, 12-41 DPP, 1-3 DAP (split-plot)
+3. Herbicide program: Non-residual and residual. (split-split-plot)
+
+there were 6 treatments in total (Cover crop x herbicide program), and 4 reps, giving a total of 24 plots inside each planting timing. 
+
+
+## Statistical analysis  
+For this study a analysis was done to observed how soybean and cover crop yield was affected by the different planting timings and cover crop termination. For all models ANOVA (type =3) was used, and Alpha levels were the same for all models (0.05). 
+
+Soybean Yield affected by planting timing and cover crop termination:
+1. Fixed effects: planting timing, cover crop termination and year. 
+2. Random effects: block and year.
+Year was selected both as fixed and random to see if there's any significant interaction between the explanatory variables within both years, but at the same time we want to consider the variability. 
+
+Cover crop yield affected by planting timing and cover crop termination:
+1. Fixed effects: planting timing, cover crop termination and year.
+2. Random effects: year 
+
+lmer was used to ran both models, since our experimental design is nested and we have random effect(s). 
+
+To check for assumptions, residuals were generated. All assumptions were met for soybean and cover crop yield. 
+
+Functions used:
+lmer
+Anova (Type =3)
+augment
+rstudent
+ranef
+ggplot 
+emmeans
+cld
+
+# Results   
+Loading packages
+```{r message=FALSE, warning=FALSE}
+library(multcompView)
+library(tibble)
+library(ggplot2)
+library(readxl)
+library(janitor)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(tidyverse)
+library(car)
+library(lme4)
+library(broom)
+library(emmeans)
+library(multcomp) 
+library(broom.mixed)
+```
+
+Importing data
+```{r, warning = FALSE, message=FALSE}
+grow <- read_csv("../data/Grow.csv") %>%
+  clean_names()
+
+grow
+```
+
+Creating two data set from original, one for soybean yield and another for cover crop yield
+```{r message=FALSE, warning=FALSE}
+grow_sb_yield <- dplyr::select(grow,
+                               plantedtiming, year, plot, block, cc_termination, yield_kgha) %>%
+  drop_na()
+
+grow_cc_yield <- dplyr::select(grow,
+                               plantedtiming, year, plot, block, cc_termination, ccbiokgha) %>%
+  drop_na()
+```
+
+Running summary and glimpse for each data set
+```{r, warning = FALSE, message=FALSE}
+summary(grow_sb_yield)
+glimpse(grow_sb_yield)
+
+summary(grow_cc_yield)
+glimpse(grow_cc_yield)
+```
+
+Based on previous summary and glimpse we need to wrangle both data set
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yieldw <- grow_sb_yield %>%
+  mutate(block = factor(block),
+         year = factor(year),
+         plantedtiming = factor(plantedtiming),
+         plot = factor(plot),
+         cc_termination = factor(cc_termination)
+         )
+
+grow_cc_yieldw <- grow_cc_yield %>%
+  mutate(block = factor(block),
+         year = factor(year),
+         plantedtiming = factor(plantedtiming),
+          plot = factor(plot),
+          cc_termination = factor(cc_termination)
+         )
+```
+
+Let's check the summary and glimpse again
+```{r, warning = FALSE, message=FALSE}
+summary(grow_sb_yieldw)
+glimpse(grow_sb_yieldw)
+
+summary(grow_cc_yieldw)
+glimpse(grow_cc_yieldw)
+```
+It looks better, for both data set. 
+Let's continue with EDA plots.
+
+
+EDA plots - Soybean yield
+```{r, warning = FALSE, message=FALSE}
+ggplot(grow_sb_yieldw, aes(x = cc_termination, 
+                         y = yield_kgha,
+                         color = year)) +
+  geom_boxplot() +
+  geom_jitter()
+
+ggplot(grow_sb_yieldw, aes(x = plantedtiming, 
+                           y = yield_kgha,
+                           color = year)) +
+  geom_boxplot() +
+  geom_jitter()
+```
+It looks like soybean yield was overall higher in 2023, but it seems termination timings did not had an effect on soybean yield, but cereal rye planting timings did, in 2023 early planting resulted in a higher yield, and in 2024, late planting resulted in higher yield. Let's check the EDA plots for cover crop biomass. 
+
+EDA plots - Cover crop yield
+```{r, warning = FALSE, message=FALSE}
+ggplot(grow_cc_yieldw, aes(x = cc_termination, 
+                           y = ccbiokgha,
+                           color = year)) +
+  geom_boxplot() +
+  geom_jitter()
+
+ggplot(grow_cc_yieldw, aes(x = plantedtiming, 
+                           y = ccbiokgha,
+                           color = year)) +
+  geom_boxplot() +
+  geom_jitter()
+```
+Based on the plots, 2024 had a higher cover crop biomass, but termination timings did not have an effect on biomass, in the other hand planting timing seems to have an effect on biomass, in both years, it looks like early planting resulted in higher biomass compared to late planting. The increase in biomass for 2024 may explain the decrease in soybean yield, it might have created crop-cover crop competition. 
+
+Let's set up to run our models
+```{r, warning = FALSE, message=FALSE}
+options(contrasts = c("contr.sum", "contr.poly"))
+```
+
+Let's start running our models, but first let's start with soybean yield. 
+
+Soybean yield
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yieldw_mod <- lmer(yield_kgha ~ plantedtiming*cc_termination*year + (1|year/block),
+                         data = grow_sb_yieldw)
+summary(grow_sb_yieldw_mod)
+
+Anova(grow_sb_yieldw_mod, type =3)
+
+```
+Based on our Anova table, there are two significant interactions: planting timing, and planting timing within years.
+
+Let's check for assumptions
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yield_resid <- augment(grow_sb_yieldw_mod) %>%
+  mutate(.studresid=rstudent(grow_sb_yieldw_mod))
+
+grow_sb_yield_resid
+
+randeff_sb <- ranef(grow_sb_yieldw_mod)$block
+
+randeff_sb
+
+
+ggplot(randeff_sb, aes(sample=`(Intercept)`))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .7
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+
+ggplot(grow_sb_yield_resid, aes(x=.fitted, y=.studresid))+
+  geom_hline(yintercept = 0, color="red")+
+  geom_point(shape = 21,
+             fill = "purple", 
+             size = 3,
+             alpha = .7)+
+  geom_smooth()+
+  geom_hline(yintercept = c(-3,3), color = "red")+
+  theme_bw()  
+
+ggplot(grow_sb_yield_resid, aes(sample=.studresid))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .7
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+
+ggplot(grow_sb_yield_resid, aes(x=.studresid))+
+  geom_density(color = "black",
+               fill = "purple",
+               alpha = .7)+
+  scale_x_continuous(breaks = c(-3,0,3), limits = c(-3,3))+
+  theme_bw()
+```
+- Residual independence: there's no pattern
+- Residual variance homogeneity: no pattern
+- Residual normality: normal distribution
+- Outlier detection: all within the three standard deviations.
+
+All assumptions are met, let's continue. 
+
+Extracting model means
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yieldw_means_plantedtiming <- emmeans(grow_sb_yieldw_mod, 
+                                  ~plantedtiming)
+
+grow_sb_yieldw_means_plantedtiming
+
+
+grow_sb_yieldw_means_plantedtimingyear <- emmeans(grow_sb_yieldw_mod,
+                                     ~plantedtiming:year)
+grow_sb_yieldw_means_plantedtimingyear
+```
+
+Pairwise comparisons
+```{r, warning = FALSE, message=FALSE}
+grow_sb_yield_cld_plantedtiming <- cld(grow_sb_yieldw_means_plantedtiming,
+                                       reversed=T,
+                                       adjust="none",
+                                       Letters=letters
+                                       )
+grow_sb_yield_cld_plantedtiming
+
+grow_sb_yield_cld_plantedtimingyear <- cld(grow_sb_yieldw_means_plantedtimingyear, 
+                                       reversed=T, 
+                                       adjust="none",
+                                       Letters=letters)
+grow_sb_yield_cld_plantedtimingyear
+```
+
+let's create a data frame including the letters to create the final plots
+```{r, warning = FALSE, message=FALSE}
+grow_sb_cld_selected <- grow_sb_yield_cld_plantedtiming %>%
+  as.data.frame() %>%
+  mutate(letter=trimws(.group))
+
+grow_sb_cld_selected
+
+grow_sb_cld_selected2 <- grow_sb_yield_cld_plantedtimingyear %>%
+  as.data.frame() %>%
+  mutate(letter=trimws(.group))
+
+grow_sb_cld_selected2
+```
+
+Final plots
+```{r, warning = FALSE, message=FALSE}
+ggplot(mapping = aes(fill = plantedtiming))+
+  # Raw data and boxplots  
+  geom_boxplot(data = grow_sb_yieldw,
+               aes(x = plantedtiming, y = yield_kgha),
+               alpha = .8) +
+  geom_jitter(data = grow_sb_yieldw,
+              aes(x = plantedtiming, y = yield_kgha),
+              shape = 21,
+              size = 3,
+              alpha = .6) +
+  # Adding letters
+  geom_label(data = grow_sb_cld_selected,
+             aes(x = plantedtiming, y = emmean, label = letter),
+             fill = "white") +
+  labs(x = "Planting Timing",
+       y = "Yield (kg/ha)") +
+  scale_fill_brewer(palette = 2) +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        legend.position = "none") +
+  scale_x_discrete(labels = c(earlyplanted = "Early planted",
+                              lateplanted = "Late planted"))
+
+ggsave("../output/soybean_yield_plantedtiming.png",
+       width = 8,
+       height = 5)
+
+ggplot(mapping = aes(fill = year))+
+  # Raw data and boxplots  
+  geom_boxplot(data = grow_sb_yieldw,
+               aes(x = plantedtiming, y = yield_kgha),
+               alpha = .8) +
+  geom_jitter(data = grow_sb_yieldw,
+              aes(x = plantedtiming, y = yield_kgha),
+              shape = 21,
+              size = 3,
+              alpha = .6) +
+  # Adding letters
+  geom_label(data = grow_sb_cld_selected2,
+             aes(x = plantedtiming, y = emmean, label = letter),
+             inherit.aes = FALSE,
+             fill = "white") +
+  labs(x = "Planting Timing",
+       y = "Yield (kg/ha)") +
+  scale_fill_brewer(palette = 2) +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+  scale_x_discrete(labels = c(earlyplanted = "Early planted",
+                              lateplanted = "Late planted"))
+
+ggsave("../output/sb_yield_plantedtiming_year.png",
+       width = 8,
+       height = 5)
+```
+2024 resulted in significantly lower yield than in 2023, and planting timing had a significant effect in each year, but it is inconsistent, in 2024 late planting resulted in higher yield, but it was not the same for 2023, however, it looks like late planted overall has a positive effect on soybean yield. 
+
+Let's look at our cover crop biomass analysis.
+
+Cover crop biomass
+```{r, warning = FALSE, message=FALSE}
+grow_cc_yield_mod <- lmer(ccbiokgha ~ plantedtiming * cc_termination * year + (1 | year/block),
+                  data = grow_cc_yieldw)
+summary(grow_cc_yield_mod)
+
+Anova(grow_cc_yield_mod, type = 3)
+```
+
+Checking assumptions
+```{r, warning = FALSE, message=FALSE}
+grow_cc_yield_resid <- augment(grow_cc_yield_mod) %>%
+  mutate(.studresid=rstudent(grow_cc_yield_mod))
+
+grow_cc_yield_resid
+
+#random effects:
+  
+randeff_cc <- ranef(grow_cc_yield_mod)$year
+
+randeff_cc
+
+ggplot(randeff_cc, aes(sample=`(Intercept)`))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .7
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+
+
+#within group errors:
+  
+  ggplot(grow_cc_yield_resid, aes(x=.fitted, y=.studresid))+
+  geom_hline(yintercept = 0, color="red")+
+  geom_point(shape = 21,
+             fill = "purple", 
+             size = 3,
+             alpha = .7)+
+  geom_smooth()+
+  geom_hline(yintercept = c(-3,3), color = "red")+
+  theme_bw()  
+  
+ggplot(grow_cc_yield_resid, aes(sample=.studresid))+
+  stat_qq(  shape = 21,
+            fill = "purple", 
+            size = 3,
+            alpha = .7
+  )+
+  stat_qq_line()+
+  labs(x = "Theoretical quantile",
+       y = "Sample quantile")+
+  theme_bw()
+
+ggplot(grow_cc_yield_resid, aes(x=.studresid))+
+  geom_density(color = "black",
+               fill = "purple",
+               alpha = .7)+
+  scale_x_continuous(breaks = c(-3,0,3), limits = c(-3,3))+
+  theme_bw()
+```
+- Residual independence: there's no pattern
+- Residual variance homogeneity: no pattern
+- Residual normality: normal distribution
+- Outlier detection: all within the three standard deviations.
+
+All assumptions are met, let's continue. 
+
+Based on our Anova table only planting timings had a significant effect on cover crop yield. 
+
+Model means
+```{r, warning = FALSE, message=FALSE}
+grow_cc_yieldw_means_plantedtiming <- emmeans(grow_cc_yield_mod, 
+                                              ~plantedtiming)
+```
+
+Pairwise comparisons
+```{r, warning = FALSE, message=FALSE}
+grow_cc_yield_cld_plantedtiming <- cld(grow_cc_yieldw_means_plantedtiming, 
+                                       reversed=T, 
+                                       adjust="none",
+                                       Letters=letters)
+
+grow_cc_yield_cld_plantedtiming
+```
+
+creating data frame
+```{r, warning = FALSE, message=FALSE}
+grow_cc_cld_selected <-grow_cc_yield_cld_plantedtiming %>%
+  as.data.frame() %>%
+  mutate(letter=trimws(.group))
+
+grow_cc_cld_selected
+
+```
+
+Final plot
+```{r, warning = FALSE, message=FALSE}
+ggplot(mapping = aes(fill = plantedtiming))+
+  # Raw data and boxplots  
+  geom_boxplot(data = grow_cc_yieldw,
+               aes(x = plantedtiming, y = ccbiokgha),
+               alpha = .8) +
+  geom_jitter(data = grow_cc_yieldw,
+              aes(x = plantedtiming, y = ccbiokgha),
+              shape = 21,
+              size = 3,
+              alpha = .6) +
+  # Adding letters
+  geom_label(data = grow_cc_cld_selected,
+             aes(x = plantedtiming, y = emmean, label = letter),
+             fill = "white") +
+  labs(x = "Planting Timing",
+       y = "Yield (kg/ha)") +
+  scale_fill_brewer(palette = 3) +
+  theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        legend.position = "none") +
+  scale_x_discrete(label = c(earlyplanted = "Early Planted",
+                             lateplanted = "Late Planted"))
+
+ggsave("../output/cc_yield_plantedtiming.png",
+       width = 8,
+       height = 5)
+```
+Early planting resulted in significantly higher cover crop biomass. 
+
+
+Based on our EDA plot and models, cereal rye biomass in 2023 was lower than 2024, and for both years early planting resulted in higher biomass, which may explain the reduction in soybean yield in 2024.
+One observation we noticed on our plots, was the lower weed density in 2024, since Cereal rye was higher in 2024, it can explain why we had lower weed density; historically cover crop can help with weed suppression by creating ground cover and limiting weed growth.
+
+Cereal rye along with an herbicide program can be effective tool. Cover crop can be critical component to creating IWM approaches for use in soybean in the Georgia.  
+
+# Team work in GitHub  
+Whether you are working with your future-self or as duos, make sure to stage, commit, and push after finishing each of the sub-sections above. When committing, write commit messages that are short and descriptive (e.g., finished wrangling).  
+
+If you are working in duos, make sure to split the workload. I will check your collaborative work through the commit history, and if one student has contributed significantly more than the other, than that will impact grades.  
+
+**Tip 1**: to avoid merge conflicts, make sure to **pull** first, and then start working locally. That will ensure that any changes made by your partner will be "downloaded" before you make changes to the files locally.  
+
+**Tip 2**: make use of the Issues on this repository to set up to-do lists and assign tasks to different people. You can also use each issue/task to discuss how things should be run and get to an agreement.  
+
+# Submitting your work  
+Once you have developed all the code and answers, make sure to Render this quarto file.  
+
+**Notes on rendering**:  
+
+- Make sure to render your work and inspect how the final html look like.  
+- If it does not look professional for whatever reason, then fix the issue, re-render it, recheck.  
+- Only send me your work once your html file looks professional.  
+- Some potential issues you may encounter and how to fix them:   
+  - Some times your code may be creating a table output that is waaay to long and cumbersome to scroll through when rendered. If this is the case, make it more professional looking by using the `head()` function to only print the first handful of rows (instead of thousands of rows).  
+  
+  - **DO NOT** delete the file's heading levels (# and ##). They set up the proper heading 1 and 2 levels, and I use them to guide my grading.  
+  
+  - If a given chunk is also outputting warnings or messages, inhibit this behavior by changing the chunk options `message` and `warning` to `FALSE`.  
+  
+  - If, after rendered, 2 lines of text are connected and you wish to "break line" between them, add 2 extra spaces after the first one.  
+
+After rendering, an .html file will be created on your `code` folder.  
+
+Rename this file to `LASTNAME1-LASTNAME2_finalproject.html`.    
+For ex., `Bastos-Mendes_finalproject.html`.
+
+Submit the html file on eLC by **April 30th** 11:59 pm.    
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
